@@ -9,7 +9,7 @@
     "react-router-dom": "^6.4.3"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "PORT=3000 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "test:e2e": "playwright test",
