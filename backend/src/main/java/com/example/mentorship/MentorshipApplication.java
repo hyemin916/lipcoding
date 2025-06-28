@@ -3,6 +3,7 @@ package com.example.mentorship;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -19,11 +20,15 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -89,6 +94,10 @@ public class MentorshipApplication {
                 .antMatchers("/api/match-requests/outgoing").hasAuthority("mentee")
                 .antMatchers("/api/match-requests/{id}/accept", "/api/match-requests/{id}/reject").hasAuthority("mentor")
                 .antMatchers("/api/match-requests/{id}").hasAuthority("mentee")
+                .antMatchers("/api/profile").hasAnyAuthority("mentor", "mentee")
+                .antMatchers("/api/match-requests/**").hasAnyAuthority("mentor", "mentee")
+                .antMatchers("/api/match-requests/**").hasAnyAuthority("mentor", "mentee")
+                .antMatchers("/api/me").authenticated()
                 .anyRequest().authenticated()
             .and()
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -142,6 +151,14 @@ public class MentorshipApplication {
                 
                 request.setAttribute("userId", userId);
                 request.setAttribute("role", role);
+                
+                // Create Spring Security Authentication object
+                Collection<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                    new SimpleGrantedAuthority(role)
+                );
+                UsernamePasswordAuthenticationToken authentication = 
+                    new UsernamePasswordAuthenticationToken(userId.toString(), null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
                 
                 filterChain.doFilter(request, response);
             } else {
