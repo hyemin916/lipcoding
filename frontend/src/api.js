@@ -50,12 +50,12 @@ export const signup = async (userData) => {
 export const login = async (credentials) => {
   try {
     const response = await api.post('/login', credentials);
-    const { token } = response.data;
+    const { token, user } = response.data;
     
     // Store token in localStorage
     localStorage.setItem('token', token);
     
-    return { token };
+    return { token, user };
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
   }
