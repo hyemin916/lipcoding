@@ -165,11 +165,10 @@ function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      await signup(formData);
-      // 예외가 발생하지 않으면 무조건 리디렉션
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 100);
+      const success = await signup(formData);
+      if (success) {
+        navigate('/login');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -422,8 +421,10 @@ function ProfilePage() {
     }
   };
 
-  const profileImageUrl = user?.profile?.imageUrl ||
-    (user?.role === 'mentor'
+  // Use backend-provided imageUrl if present, else fallback to default
+  const profileImageUrl = user?.profile?.imageUrl && !user?.profile?.imageUrl.startsWith('/')
+    ? user.profile.imageUrl
+    : (user?.role === 'mentor'
       ? 'https://placehold.co/500x500.jpg?text=MENTOR'
       : 'https://placehold.co/500x500.jpg?text=MENTEE');
 
@@ -454,7 +455,6 @@ function ProfilePage() {
             required
           />
         </div>
-        
         <div className="form-group">
           <label htmlFor="bio">Bio:</label>
           <textarea
@@ -465,7 +465,6 @@ function ProfilePage() {
             rows="4"
           />
         </div>
-        
         {user?.role === 'mentor' && (
           <div className="form-group">
             <label htmlFor="skillsets">Skills (comma-separated):</label>
@@ -478,7 +477,6 @@ function ProfilePage() {
             />
           </div>
         )}
-        
         <div className="form-group">
           <label htmlFor="profile">Profile Image:</label>
           <input
@@ -490,7 +488,6 @@ function ProfilePage() {
           />
           <small>Max size: 1MB, Formats: JPG, PNG</small>
         </div>
-        
         <button
           type="submit"
           id="save"
@@ -522,6 +519,7 @@ function MentorsPage() {
   const fetchMentors = async (skill, orderBy) => {
     try {
       setLoading(true);
+      // orderBy -> order_by (백엔드 파라미터명 일치)
       const mentorsData = await api.getMentors(skill, orderBy);
       setMentors(mentorsData);
     } catch (err) {
@@ -641,49 +639,56 @@ function MentorsPage() {
         <div>No mentors found</div>
       ) : (
         <div className="mentors-list">
-          {mentors.map(mentor => (
-            <div key={mentor.id} className="mentor">
-              <div className="mentor-info">
-                <img
-                  src={mentor.profile.imageUrl}
-                  alt={mentor.profile.name}
-                  className="mentor-image"
-                />
-                <h3>{mentor.profile.name}</h3>
-                <p>{mentor.profile.bio}</p>
-                <div className="skills">
-                  <strong>Skills:</strong>
-                  <span>{mentor.profile.skills?.join(', ')}</span>
+          {mentors.map(mentor => {
+            // mentor.profile.imageUrl가 /로 시작하면 백엔드 이미지 API, 아니면 기본 URL
+            let imageUrl = mentor.profile.imageUrl;
+            if (imageUrl && imageUrl.startsWith('/')) {
+              imageUrl = `http://localhost:8080/api${imageUrl}`;
+            }
+            if (!imageUrl) {
+              imageUrl = 'https://placehold.co/500x500.jpg?text=MENTOR';
+            }
+            return (
+              <div key={mentor.id} className="mentor">
+                <div className="mentor-info">
+                  <img
+                    src={imageUrl}
+                    alt={mentor.profile.name}
+                    className="mentor-image"
+                  />
+                  <h3>{mentor.profile.name}</h3>
+                  <p>{mentor.profile.bio}</p>
+                  <div className="skills">
+                    <strong>Skills:</strong>
+                    <span>{mentor.profile.skills?.join(', ')}</span>
+                  </div>
+                </div>
+                <div className="request-form">
+                  <textarea
+                    id="message"
+                    data-mentor-id={mentor.id}
+                    data-testid={`message-${mentor.id}`}
+                    placeholder="Enter your message..."
+                    value={requestMessages[mentor.id] || ''}
+                    onChange={(e) => handleMessageChange(mentor.id, e.target.value)}
+                    disabled={pendingRequest}
+                  ></textarea>
+                  <button
+                    id="request"
+                    onClick={() => handleSendRequest(mentor.id)}
+                    disabled={pendingRequest}
+                  >
+                    Send Request
+                  </button>
+                  {pendingRequest && (
+                    <div id="request-status" className="request-status">
+                      You already have a pending request
+                    </div>
+                  )}
                 </div>
               </div>
-              
-              <div className="request-form">
-                <textarea
-                  id="message"
-                  data-mentor-id={mentor.id}
-                  data-testid={`message-${mentor.id}`}
-                  placeholder="Enter your message..."
-                  value={requestMessages[mentor.id] || ''}
-                  onChange={(e) => handleMessageChange(mentor.id, e.target.value)}
-                  disabled={pendingRequest}
-                ></textarea>
-                
-                <button
-                  id="request"
-                  onClick={() => handleSendRequest(mentor.id)}
-                  disabled={pendingRequest}
-                >
-                  Send Request
-                </button>
-                
-                {pendingRequest && (
-                  <div id="request-status" className="request-status">
-                    You already have a pending request
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

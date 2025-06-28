@@ -1,46 +1,22 @@
 import axios from 'axios';
 
-// Create axios instance with base URL
-const api = axios.create({
+// Axios 인스턴스 생성 및 JWT 자동 첨부
+const axiosInstance = axios.create({
   baseURL: 'http://localhost:8080/api',
-  headers: {
-    'Content-Type': 'application/json'
-  }
 });
 
-// Add request interceptor for adding auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+axiosInstance.interceptors.request.use(config => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
   }
-);
-
-// Add response interceptor for handling errors
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    // Handle 401 unauthorized errors
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+  return config;
+});
 
 // Auth API calls
 export const signup = async (userData) => {
   try {
-    const response = await api.post('/signup', userData);
+    const response = await axiosInstance.post('/signup', userData);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -49,7 +25,7 @@ export const signup = async (userData) => {
 
 export const login = async (credentials) => {
   try {
-    const response = await api.post('/login', credentials);
+    const response = await axiosInstance.post('/login', credentials);
     const { token, user } = response.data;
     
     // Store token in localStorage
@@ -72,7 +48,7 @@ export const isAuthenticated = () => {
 // User API calls
 export const getCurrentUser = async () => {
   try {
-    const response = await api.get('/me');
+    const response = await axiosInstance.get('/me');
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -81,7 +57,7 @@ export const getCurrentUser = async () => {
 
 export const updateProfile = async (profileData) => {
   try {
-    const response = await api.put('/profile', profileData);
+    const response = await axiosInstance.put('/profile', profileData);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -99,24 +75,13 @@ export const getImageUrl = (role, id) => {
 };
 
 // Mentor API calls
+// 백엔드 파라미터명에 맞춰 order_by로 전송
 export const getMentors = async (skill, orderBy) => {
   try {
-    let url = '/mentors';
-    const params = new URLSearchParams();
-    
-    if (skill) {
-      params.append('skill', skill);
-    }
-    
-    if (orderBy) {
-      params.append('order_by', orderBy);
-    }
-    
-    if (params.toString()) {
-      url += `?${params.toString()}`;
-    }
-    
-    const response = await api.get(url);
+    const params = {};
+    if (skill) params.skill = skill;
+    if (orderBy) params.order_by = orderBy;
+    const response = await axiosInstance.get('/mentors', { params });
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -126,7 +91,7 @@ export const getMentors = async (skill, orderBy) => {
 // Match Request API calls
 export const createMatchRequest = async (requestData) => {
   try {
-    const response = await api.post('/match-requests', requestData);
+    const response = await axiosInstance.post('/match-requests', requestData);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -135,7 +100,7 @@ export const createMatchRequest = async (requestData) => {
 
 export const getIncomingMatchRequests = async () => {
   try {
-    const response = await api.get('/match-requests/incoming');
+    const response = await axiosInstance.get('/match-requests/incoming');
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -144,7 +109,7 @@ export const getIncomingMatchRequests = async () => {
 
 export const getOutgoingMatchRequests = async () => {
   try {
-    const response = await api.get('/match-requests/outgoing');
+    const response = await axiosInstance.get('/match-requests/outgoing');
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -153,7 +118,7 @@ export const getOutgoingMatchRequests = async () => {
 
 export const acceptMatchRequest = async (requestId) => {
   try {
-    const response = await api.put(`/match-requests/${requestId}/accept`);
+    const response = await axiosInstance.put(`/match-requests/${requestId}/accept`);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -162,7 +127,7 @@ export const acceptMatchRequest = async (requestId) => {
 
 export const rejectMatchRequest = async (requestId) => {
   try {
-    const response = await api.put(`/match-requests/${requestId}/reject`);
+    const response = await axiosInstance.put(`/match-requests/${requestId}/reject`);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
@@ -171,7 +136,7 @@ export const rejectMatchRequest = async (requestId) => {
 
 export const cancelMatchRequest = async (requestId) => {
   try {
-    const response = await api.delete(`/match-requests/${requestId}`);
+    const response = await axiosInstance.delete(`/match-requests/${requestId}`);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : { error: 'Network error' };
