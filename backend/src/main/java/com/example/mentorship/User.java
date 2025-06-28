@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * Single class containing all user-related data and operations.
@@ -16,11 +17,13 @@ public class User {
     // Fields
     private Integer id;
     private String email;
+    @JsonIgnore
     private String password;
     private String name;
     private String role; // "mentor" or "mentee"
     private String bio;
     private List<String> skills; // Only for mentors
+    @JsonIgnore
     private byte[] imageData;
 
     // Static in-memory storage

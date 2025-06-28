@@ -1,23 +1,28 @@
 package com.example.mentorship;
 
-import io.swagger.v3.oas.annotations.OpenAPIDefinition;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.info.Info;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -27,7 +32,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,18 +41,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.view.RedirectView;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Main application class containing all endpoints and security configuration.
@@ -266,17 +263,22 @@ public class MentorshipApplication {
         try {
             String email = request.get("email");
             String password = request.get("password");
-            
+            // 필수 필드 누락 시 401 반환
+            if (email == null || email.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                        Collections.singletonMap("error", "Missing email or password"));
+            }
             User user = User.findByEmail(email);
-            
             if (user == null || !password.equals(user.getPassword())) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                         Collections.singletonMap("error", "Invalid credentials"));
             }
-            
             String token = JwtUtil.generateToken(user);
-            
-            return ResponseEntity.ok(Collections.singletonMap("token", token));
+            // Create response map with token and user data
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", token);
+            response.put("user", user);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     Collections.singletonMap("error", e.getMessage()));
@@ -460,25 +462,23 @@ public class MentorshipApplication {
     @GetMapping("/mentors")
     public ResponseEntity<?> getMentors(
             @RequestParam(required = false) String skill,
-            @RequestParam(required = false) String order_by,
+            @RequestParam(required = false, name = "order_by") String orderBy,
             HttpServletRequest request) {
         try {
             List<User> mentors;
-            
             // Filter by skill if provided
             if (skill != null && !skill.isEmpty()) {
                 mentors = User.findMentorsBySkill(skill);
             } else {
                 mentors = User.findMentors();
             }
-            
             // Sort if requested
-            if (order_by != null) {
-                if ("name".equals(order_by)) {
+            if (orderBy != null) {
+                if ("name".equals(orderBy)) {
                     mentors = mentors.stream()
                             .sorted((m1, m2) -> m1.getName().compareToIgnoreCase(m2.getName()))
                             .collect(Collectors.toList());
-                } else if ("skill".equals(order_by)) {
+                } else if ("skill".equals(orderBy)) {
                     mentors = mentors.stream()
                             .sorted((m1, m2) -> {
                                 String skills1 = m1.getSkills() == null ? "" : String.join(",", m1.getSkills());
@@ -488,18 +488,15 @@ public class MentorshipApplication {
                             .collect(Collectors.toList());
                 }
             }
-            
             // Convert to response format
             List<Map<String, Object>> response = mentors.stream().map(mentor -> {
                 Map<String, Object> mentorMap = new HashMap<>();
                 mentorMap.put("id", mentor.getId());
                 mentorMap.put("email", mentor.getEmail());
                 mentorMap.put("role", mentor.getRole());
-                
                 Map<String, Object> profile = new HashMap<>();
                 profile.put("name", mentor.getName());
                 profile.put("bio", mentor.getBio());
-                
                 String imageUrl = null;
                 if (mentor.getImageData() != null) {
                     imageUrl = "/images/mentor/" + mentor.getId();
@@ -509,11 +506,9 @@ public class MentorshipApplication {
                 }
                 profile.put("imageUrl", imageUrl);
                 profile.put("skills", mentor.getSkills());
-                
                 mentorMap.put("profile", profile);
                 return mentorMap;
             }).collect(Collectors.toList());
-            
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
